@@ -17,7 +17,6 @@ limitations under the License.
 package auth
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -56,7 +55,6 @@ func (suite *AuthorizationTestSuite) TearDownSuite() {
 }
 
 func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
-	var req *http.Request
 	var authorization *Authorization
 	var err error
 
@@ -66,52 +64,43 @@ func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
 	expectedWWWAuthHeader := "Basic realm=\"cm-test-realm\""
 
 	// No username/password
-	req, _ = http.NewRequest(http.MethodGet, "/charts/mychart-0.1.0.tgz", nil)
-	authorization, err = suite.BasicAuthAuthorizer.AuthorizeRequest(req, PullAction, "")
+	authorization, err = suite.BasicAuthAuthorizer.Authorize("", PullAction, "")
 	suite.False(authorization.Authorized)
 	suite.Equal(expectedWWWAuthHeader, authorization.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Bad username/password
-	req, _ = http.NewRequest(http.MethodGet, "/charts/mychart-0.1.0.tgz", nil)
-	req.Header.Set("Authorization", badAuthorizationHeader)
-	authorization, err = suite.BasicAuthAuthorizer.AuthorizeRequest(req, PullAction, "")
+	authorization, err = suite.BasicAuthAuthorizer.Authorize(badAuthorizationHeader, PullAction, "")
 	suite.False(authorization.Authorized)
 	suite.Equal(expectedWWWAuthHeader, authorization.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Correct username/password
-	req, _ = http.NewRequest(http.MethodGet, "/charts/mychart-0.1.0.tgz", nil)
-	req.Header.Set("Authorization", goodAuthorizationHeader)
-	authorization, err = suite.BasicAuthAuthorizer.AuthorizeRequest(req, PullAction, "")
+	authorization, err = suite.BasicAuthAuthorizer.Authorize(goodAuthorizationHeader, PullAction, "")
 	suite.True(authorization.Authorized)
 	suite.Equal("", authorization.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Pull, no username/password (GET/PullAction)
-	req, _ = http.NewRequest(http.MethodGet, "/charts/mychart-0.1.0.tgz", nil)
-	authorization, err = suite.BasicAuthAnonymousPullAuthorizer.AuthorizeRequest(req, PullAction, "")
+	authorization, err = suite.BasicAuthAnonymousPullAuthorizer.Authorize("", PullAction, "")
 	suite.True(authorization.Authorized)
 	suite.Equal("", authorization.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Pull, no username/password (POST/PushAction)
-	req, _ = http.NewRequest(http.MethodPost, "/api/charts", nil)
-	authorization, err = suite.BasicAuthAnonymousPullAuthorizer.AuthorizeRequest(req, PushAction, "")
+	authorization, err = suite.BasicAuthAnonymousPullAuthorizer.Authorize("", PushAction, "")
 	suite.False(authorization.Authorized)
 	suite.Equal(expectedWWWAuthHeader, authorization.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Push, no username/password (GET/PullAction)
-	req, _ = http.NewRequest(http.MethodGet, "/charts/mychart-0.1.0.tgz", nil)
-	authorization, err = suite.BasicAuthAnonymousPushAuthorizer.AuthorizeRequest(req, PullAction, "")
+	authorization, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PullAction, "")
 	suite.True(authorization.Authorized)
 	suite.Equal("", authorization.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Push, no username/password (POST/PushAction)
-	req, _ = http.NewRequest(http.MethodPost, "/api/charts", nil)
-	authorization, err = suite.BasicAuthAnonymousPushAuthorizer.AuthorizeRequest(req, PushAction, "")
+	authorization, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PushAction, "")
 	suite.True(authorization.Authorized)
 	suite.Equal("", authorization.WWWAuthenticateHeader)
 	suite.Nil(err)

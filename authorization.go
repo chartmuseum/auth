@@ -48,7 +48,7 @@ type (
 
 	// Authorizer is a generic interface for authorizers
 	Authorizer interface {
-		AuthorizeRequest(request *http.Request, action string, repo string) (*Authorization, error)
+		Authorize(authHeader string, action string, repo string) (*Authorization, error)
 	}
 
 	// BasicAuthAuthorizer is TODO
@@ -68,7 +68,6 @@ type (
 )
 
 func NewBasicAuthAuthorizer(opts *BasicAuthAuthorizerOptions) *BasicAuthAuthorizer {
-
 	basicAuthAuthorizer := BasicAuthAuthorizer{
 		Realm:                opts.Realm,
 		BasicAuthMatchHeader: generateBasicAuthHeader(opts.Username, opts.Password),
@@ -77,13 +76,13 @@ func NewBasicAuthAuthorizer(opts *BasicAuthAuthorizerOptions) *BasicAuthAuthoriz
 	return &basicAuthAuthorizer
 }
 
-func (authorizer *BasicAuthAuthorizer) AuthorizeRequest(request *http.Request, action string, repo string) (*Authorization, error) {
+func (authorizer *BasicAuthAuthorizer) Authorize(authHeader string, action string, repo string) (*Authorization, error) {
 	var authorized bool
 	var wwwAuthenticateHeader string
 
 	if containsAction(authorizer.AnonymousActions, action) {
 		authorized = true
-	} else if request.Header.Get("Authorization") == authorizer.BasicAuthMatchHeader {
+	} else if authHeader == authorizer.BasicAuthMatchHeader {
 		authorized = true
 	} else {
 		wwwAuthenticateHeader = fmt.Sprintf("Basic realm=\"%s\"", authorizer.Realm)
@@ -97,10 +96,9 @@ func (authorizer *BasicAuthAuthorizer) AuthorizeRequest(request *http.Request, a
 	return &authorization, nil
 }
 
-var (
-	PullAction       = "pull"
-	PushAction       = "push"
-	SystemInfoAction = "sysinfo"
+const (
+	PullAction = "pull"
+	PushAction = "push"
 )
 
 func containsAction(actionsList []string, action string) bool {
