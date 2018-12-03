@@ -40,17 +40,76 @@ type (
 		AuthPublicCert   []byte
 	}
 
-	action string
+	// Authorization is TODO
+	Authorization struct {
+		Authorized            bool
+		WWWAuthenticateHeader string
+	}
+
+	// Authorizer is a generic interface for authorizers
+	Authorizer interface {
+		AuthorizeRequest(request *http.Request, action string, repo string) (*Authorization, error)
+	}
+
+	// BasicAuthAuthorizer is TODO
+	BasicAuthAuthorizer struct {
+		Realm                string
+		BasicAuthMatchHeader string
+		AnonymousActions     []string
+	}
+
+	// BasicAuthAuthorizerOptions is TODO
+	BasicAuthAuthorizerOptions struct {
+		Realm            string
+		Username         string
+		Password         string
+		AnonymousActions []string
+	}
 )
+
+func NewBasicAuthAuthorizer(opts *BasicAuthAuthorizerOptions) *BasicAuthAuthorizer {
+
+	basicAuthAuthorizer := BasicAuthAuthorizer{
+		Realm:                opts.Realm,
+		BasicAuthMatchHeader: generateBasicAuthHeader(opts.Username, opts.Password),
+		AnonymousActions:     opts.AnonymousActions,
+	}
+	return &basicAuthAuthorizer
+}
+
+func (authorizer *BasicAuthAuthorizer) AuthorizeRequest(request *http.Request, action string, repo string) (*Authorization, error) {
+	var authorized bool
+	var wwwAuthenticateHeader string
+
+	if containsAction(authorizer.AnonymousActions, action) {
+		authorized = true
+	} else if request.Header.Get("Authorization") == authorizer.BasicAuthMatchHeader {
+		authorized = true
+	} else {
+		wwwAuthenticateHeader = fmt.Sprintf("Basic realm=\"%s\"", authorizer.Realm)
+	}
+
+	authorization := Authorization{
+		Authorized:            authorized,
+		WWWAuthenticateHeader: wwwAuthenticateHeader,
+	}
+
+	return &authorization, nil
+}
 
 var (
-	RepoPullAction   action = "pull"
-	RepoPushAction   action = "push"
-	SystemInfoAction action = "sysinfo"
+	PullAction       = "pull"
+	PushAction       = "push"
+	SystemInfoAction = "sysinfo"
 )
 
-func isRepoAction(act action) bool {
-	return act == RepoPullAction || act == RepoPushAction
+func containsAction(actionsList []string, action string) bool {
+	for _, a := range actionsList {
+		if a == action {
+			return true
+		}
+	}
+	return false
 }
 
 func generateBasicAuthHeader(username string, password string) string {
