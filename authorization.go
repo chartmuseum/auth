@@ -28,6 +28,21 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
+type (
+	// Router handles all incoming HTTP requests
+	Router struct {
+		BasicAuthHeader  string
+		BearerAuthHeader string
+		AnonymousGet     bool
+		AuthRealm        string
+		AuthService      string
+		AuthIssuer       string
+		AuthPublicCert   []byte
+	}
+
+	action string
+)
+
 var (
 	RepoPullAction   action = "pull"
 	RepoPushAction   action = "push"
@@ -122,7 +137,7 @@ func getRSAKey(key []byte) (*rsa.PublicKey, error) {
 func loadPublicCertFromFile(certPath string, router *Router) {
 	publicKey, err := ioutil.ReadFile(certPath)
 	if err != nil {
-		router.Logger.Fatal("Error reading Public Key")
+		panic(err)
 	}
 	router.AuthPublicCert = publicKey
 }
