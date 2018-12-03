@@ -80,12 +80,6 @@ type (
 	action string
 )
 
-var (
-	RepoPullAction   action = "pull"
-	RepoPushAction   action = "push"
-	SystemInfoAction action = "sysinfo"
-)
-
 // NewRouter creates a new Router instance
 func NewRouter(options RouterOptions) *Router {
 	gin.SetMode(gin.ReleaseMode)

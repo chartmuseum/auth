@@ -28,6 +28,12 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
+var (
+	RepoPullAction   action = "pull"
+	RepoPushAction   action = "push"
+	SystemInfoAction action = "sysinfo"
+)
+
 func isRepoAction(act action) bool {
 	return act == RepoPullAction || act == RepoPushAction
 }
@@ -74,7 +80,7 @@ func (router *Router) authorizeRequest(request *http.Request) (bool, map[string]
 	} else {
 		authorized = true
 	}
-	
+
 	return authorized, responseHeaders
 }
 
