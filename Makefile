@@ -11,3 +11,7 @@ test:
 	rm -rf .test/ && mkdir .test/
 	go test -v -covermode=atomic -coverprofile=coverage.out .
 	go tool cover -html=coverage.out -o=coverage.html
+
+.PHONY: getjwt
+getjwt:
+	@go run testcmd/getjwt/main.go
