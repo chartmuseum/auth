@@ -102,10 +102,10 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 	return &authorizer, nil
 }
 
-func (authorizer *Authorizer) Authorize(authHeader string, action string, repo string) (*Permission, error) {
+func (authorizer *Authorizer) Authorize(authHeader string, action string, namespace string) (*Permission, error) {
 	if containsAction(authorizer.AnonymousActions, action) {
 
-		// Anonymous action allowed (set in AuthorizerOptions)
+		// This specific action allowed anonymously
 		return &Permission{Allowed: true}, nil
 
 	} else if authorizer.Type == BasicAuthAuthorizerType {
@@ -116,13 +116,12 @@ func (authorizer *Authorizer) Authorize(authHeader string, action string, repo s
 	} else if authorizer.Type == BearerAuthAuthorizerType {
 
 		// Bearer
-		return authorizer.authorizeBearerAuth(authHeader, action, repo)
+		return authorizer.authorizeBearerAuth(authHeader, action, namespace)
 	}
 
 	return nil, errors.New(fmt.Sprintf("unknown authorizer type: %s", authorizer.Type))
 }
 
-// Basic
 func (authorizer *Authorizer) authorizeBasicAuth(authHeader string) (*Permission, error) {
 	var allowed bool
 	var wwwAuthenticateHeader string
@@ -141,23 +140,19 @@ func (authorizer *Authorizer) authorizeBasicAuth(authHeader string) (*Permission
 	return &permission, nil
 }
 
-// Bearer
-func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action string, repo string) (*Permission, error) {
+func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action string, namespace string) (*Permission, error) {
 	var allowed bool
 	var wwwAuthenticateHeader string
 
-	// TODO check length of splitToken / enhance
-	splitToken := strings.Split(authHeader, "Bearer ")
-	_, err := validateJWT(splitToken[1], authorizer.PublicKey)
+	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
+	_, err := validateJWT(authHeader, authorizer.PublicKey)
 	if err != nil {
-		return nil, err
-	} else {
+		// TODO log/enumerate error
 		wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
+	} else {
+		// TODO inspect claims
+		allowed = true
 	}
-
-	// TODO inspect claims
-	allowed = true
-	//wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
 
 	permission := Permission{
 		Allowed:               allowed,

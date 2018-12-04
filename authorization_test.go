@@ -34,20 +34,26 @@ type AuthorizationTestSuite struct {
 	BearerAuthAnonymousPushAuthorizer *Authorizer
 
 	UnknownTypeAuthorizer *Authorizer
+
+	BasicBadAuthorizationHeader          string
+	BasicGoodAuthorizationHeader         string
+	BasicExpectedWWWAuthHeader           string
+	BearerPullScopeExpectedWWWAuthHeader string
+	BearerPushScopeExpectedWWWAuthHeader string
 }
 
 var (
 	testPrivateKey = "./testdata/server.key"
-	testPublicKey = "./testdata/server.pem"
+	testPublicKey  = "./testdata/server.pem"
 )
 
 func (suite *AuthorizationTestSuite) SetupSuite() {
 	var err error
 
 	suite.BasicAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:            "cm-test-realm",
-		Username:         "cm-test-user",
-		Password:         "cm-test-pass",
+		Realm:    "cm-test-realm",
+		Username: "cm-test-user",
+		Password: "cm-test-pass",
 	})
 	suite.Nil(err)
 
@@ -68,26 +74,32 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.Nil(err)
 
 	suite.BearerAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm: "cm-test-realm",
+		Realm:          "cm-test-realm",
 		PublicCertPath: testPublicKey,
 	})
 	suite.Nil(err)
 
 	suite.BearerAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm: "cm-test-realm",
-		PublicCertPath: testPublicKey,
+		Realm:            "cm-test-realm",
+		PublicCertPath:   testPublicKey,
 		AnonymousActions: []string{PullAction},
 	})
 	suite.Nil(err)
 
 	suite.BearerAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm: "cm-test-realm",
-		PublicCertPath: testPublicKey,
+		Realm:            "cm-test-realm",
+		PublicCertPath:   testPublicKey,
 		AnonymousActions: []string{PullAction, PushAction},
 	})
 	suite.Nil(err)
 
 	suite.UnknownTypeAuthorizer = &Authorizer{Type: AuthorizerType("unknown")}
+
+	suite.BasicBadAuthorizationHeader = generateBasicAuthHeader("cm-test-baduser", "cm-test-badpass")
+	suite.BasicGoodAuthorizationHeader = generateBasicAuthHeader("cm-test-user", "cm-test-pass")
+	suite.BasicExpectedWWWAuthHeader = "Basic realm=\"cm-test-realm\""
+	suite.BearerPullScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
+	suite.BearerPushScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
 }
 
 func (suite *AuthorizationTestSuite) TearDownSuite() {
@@ -102,17 +114,14 @@ func (suite *AuthorizationTestSuite) TestNewAuthorizer() {
 	suite.NotNil(err)
 }
 
-func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
+func (suite *AuthorizationTestSuite) TestAuthorizeBasicRequest() {
 	var permission *Permission
 	var err error
-
-	badAuthorizationHeader := generateBasicAuthHeader("cm-test-baduser", "cm-test-badpass")
-	goodAuthorizationHeader := generateBasicAuthHeader("cm-test-user", "cm-test-pass")
 
 	expectedWWWAuthHeader := "Basic realm=\"cm-test-realm\""
 
 	// Unknown authorizer type returns err
-	permission, err = suite.UnknownTypeAuthorizer.Authorize(goodAuthorizationHeader, PullAction, "")
+	permission, err = suite.UnknownTypeAuthorizer.Authorize(suite.BasicGoodAuthorizationHeader, PullAction, "")
 	suite.Nil(permission)
 	suite.NotNil(err)
 
@@ -123,13 +132,13 @@ func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
 	suite.Nil(err)
 
 	// Bad username/password
-	permission, err = suite.BasicAuthAuthorizer.Authorize(badAuthorizationHeader, PullAction, "")
+	permission, err = suite.BasicAuthAuthorizer.Authorize(suite.BasicBadAuthorizationHeader, PullAction, "")
 	suite.False(permission.Allowed)
 	suite.Equal(expectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Correct username/password
-	permission, err = suite.BasicAuthAuthorizer.Authorize(goodAuthorizationHeader, PullAction, "")
+	permission, err = suite.BasicAuthAuthorizer.Authorize(suite.BasicGoodAuthorizationHeader, PullAction, "")
 	suite.True(permission.Allowed)
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -156,6 +165,23 @@ func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
 	permission, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PushAction, "")
 	suite.True(permission.Allowed)
 	suite.Equal("", permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// No username/password
+	permission, err = suite.BasicAuthAuthorizer.Authorize("", PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(expectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+}
+
+func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
+	var permission *Permission
+	var err error
+
+	// No token
+	permission, err = suite.BearerAuthAuthorizer.Authorize("", PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 }
 
