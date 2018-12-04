@@ -17,13 +17,17 @@ limitations under the License.
 package auth
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 )
 
 type AuthorizationTestSuite struct {
 	suite.Suite
+
+	TokenGenerator *TokenGenerator
 
 	BasicAuthAuthorizer              *Authorizer
 	BasicAuthAnonymousPullAuthorizer *Authorizer
@@ -42,13 +46,13 @@ type AuthorizationTestSuite struct {
 	BearerPushScopeExpectedWWWAuthHeader string
 }
 
-var (
-	testPrivateKey = "./testdata/server.key"
-	testPublicKey  = "./testdata/server.pem"
-)
-
 func (suite *AuthorizationTestSuite) SetupSuite() {
 	var err error
+
+	generator, err := NewTokenGenerator(&TokenGeneratorOptions{PrivateCertPath: testPrivateKey})
+	suite.Nil(err)
+
+	suite.TokenGenerator = generator
 
 	suite.BasicAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 		Realm:    "cm-test-realm",
@@ -180,6 +184,124 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 
 	// No token
 	permission, err = suite.BearerAuthAuthorizer.Authorize("", PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Valid token
+	access := []AccessEntry{
+		{
+			Name:    "",
+			Type:    DefaultAccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader := fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Namespace checks
+	access = []AccessEntry{
+		{
+			Name:    "",
+			Type:    DefaultAccessEntryType,
+			Actions: []string{PullAction},
+		},
+		{
+			Name:    "org1/repo1",
+			Type:    DefaultAccessEntryType,
+			Actions: []string{PullAction},
+		},
+		{
+			Name:    "org1/repo2",
+			Type:    DefaultAccessEntryType,
+			Actions: []string{PullAction, PushAction},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "org1/repo1")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "org1/repo2")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "org1/repo1")
+	suite.False(permission.Allowed)
+	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "org1/repo2")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Expired Token
+	access = []AccessEntry{
+		{
+			Name:    "",
+			Type:    DefaultAccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, time.Second*1)
+	suite.Nil(err)
+	fmt.Println("Sleeping for 2 seconds to test token expiration...")
+	time.Sleep(time.Second * 2)
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Token entry type is not recognized
+	access = []AccessEntry{
+		{
+			Name:    "",
+			Type:    "fake-type",
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Token entry does not have action requested
+	access = []AccessEntry{
+		{
+			Name:    "",
+			Type:    DefaultAccessEntryType,
+			Actions: []string{},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)

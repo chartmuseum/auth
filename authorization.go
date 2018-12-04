@@ -17,14 +17,9 @@ limitations under the License.
 package auth
 
 import (
-	"crypto/rsa"
-	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"strings"
-
-	"github.com/dgrijalva/jwt-go"
 )
 
 const (
@@ -48,7 +43,7 @@ type (
 		Service              string
 		Issuer               string
 		BasicAuthMatchHeader string
-		PublicKey            *rsa.PublicKey
+		TokenDecoder         *TokenDecoder
 		AnonymousActions     []string
 	}
 
@@ -91,12 +86,15 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 		authorizer.Service = opts.Service
 		authorizer.Issuer = opts.Issuer
 
-		publicKey, err := generatePublicKey(opts.PublicCertPath, opts.PublicCert)
+		tokenDecoder, err := NewTokenDecoder(&TokenDecoderOptions{
+			PublicCert:     opts.PublicCert,
+			PublicCertPath: opts.PublicCertPath,
+		})
 		if err != nil {
 			return nil, err
 		}
 
-		authorizer.PublicKey = publicKey
+		authorizer.TokenDecoder = tokenDecoder
 	}
 
 	return &authorizer, nil
@@ -144,14 +142,35 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	var allowed bool
 	var wwwAuthenticateHeader string
 
-	authHeader = strings.TrimPrefix(authHeader, "Bearer ")
-	_, err := validateJWT(authHeader, authorizer.PublicKey)
-	if err != nil {
-		// TODO log/enumerate error
+	signedString := strings.TrimPrefix(authHeader, "Bearer ")
+
+	// TODO log error
+	token, err := authorizer.TokenDecoder.DecodeToken(signedString)
+	if err == nil {
+
+		// TODO log error
+		claims, err := getTokenCustomClaims(token)
+		if err == nil {
+			for _, entry := range claims.Access {
+				if entry.Type == DefaultAccessEntryType {
+					if entry.Name == namespace {
+						for _, act := range entry.Actions {
+							if act == action {
+								allowed = true
+								break
+							}
+						}
+					}
+				}
+				if allowed {
+					break
+				}
+			}
+		}
+	}
+
+	if !allowed {
 		wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
-	} else {
-		// TODO inspect claims
-		allowed = true
 	}
 
 	permission := Permission{
@@ -160,52 +179,4 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	}
 
 	return &permission, nil
-}
-
-func containsAction(actionsList []string, action string) bool {
-	for _, a := range actionsList {
-		if a == action {
-			return true
-		}
-	}
-	return false
-}
-
-func generatePublicKey(publicCertPath string, publicCert []byte) (*rsa.PublicKey, error) {
-	var pem []byte
-
-	if publicCertPath != "" {
-		var err error
-		pem, err = ioutil.ReadFile(publicCertPath)
-		if err != nil {
-			return nil, err
-		}
-	} else if publicCert != nil {
-		pem = publicCert
-	} else {
-		return nil, errors.New("Must supply either PublicCertPath or PublicCert")
-	}
-
-	// https://github.com/dgrijalva/jwt-go/blob/master/rsa_test.go
-	return jwt.ParseRSAPublicKeyFromPEM(pem)
-}
-
-func generateBasicAuthHeader(username string, password string) string {
-	base := username + ":" + password
-	basicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
-	return basicAuthHeader
-}
-
-// verify if JWT is valid by using the rsa public certificate pem
-// currently this only works with RSA key signing
-// TODO: how best to handle many different signing algorithms?
-func validateJWT(t string, key *rsa.PublicKey) (*jwt.Token, error) {
-	token, err := jwt.Parse(t, func(token *jwt.Token) (interface{}, error) {
-		return key, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return token, nil
 }
