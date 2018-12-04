@@ -10,7 +10,7 @@ Go library for generating [ChartMuseum](https://github.com/helm/chartmuseum) JWT
 
 ### Generating a JWT token (example)
 
-```
+```go
 package main
 
 import (
