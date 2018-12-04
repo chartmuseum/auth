@@ -32,6 +32,8 @@ type AuthorizationTestSuite struct {
 	BearerAuthAuthorizer              *Authorizer
 	BearerAuthAnonymousPullAuthorizer *Authorizer
 	BearerAuthAnonymousPushAuthorizer *Authorizer
+
+	UnknownTypeAuthorizer *Authorizer
 }
 
 var (
@@ -84,10 +86,20 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 		AnonymousActions: []string{PullAction, PushAction},
 	})
 	suite.Nil(err)
+
+	suite.UnknownTypeAuthorizer = &Authorizer{Type: AuthorizerType("unknown")}
 }
 
 func (suite *AuthorizationTestSuite) TearDownSuite() {
 	return
+}
+
+func (suite *AuthorizationTestSuite) TestNewAuthorizer() {
+	authorizer, err := NewAuthorizer(&AuthorizerOptions{
+		Realm: "cm-test-realm",
+	})
+	suite.Nil(authorizer)
+	suite.NotNil(err)
 }
 
 func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
@@ -98,6 +110,11 @@ func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
 	goodAuthorizationHeader := generateBasicAuthHeader("cm-test-user", "cm-test-pass")
 
 	expectedWWWAuthHeader := "Basic realm=\"cm-test-realm\""
+
+	// Unknown authorizer type returns err
+	permission, err = suite.UnknownTypeAuthorizer.Authorize(goodAuthorizationHeader, PullAction, "")
+	suite.Nil(permission)
+	suite.NotNil(err)
 
 	// No username/password
 	permission, err = suite.BasicAuthAuthorizer.Authorize("", PullAction, "")

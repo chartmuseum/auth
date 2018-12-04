@@ -151,6 +151,8 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	_, err := validateJWT(splitToken[1], authorizer.PublicKey)
 	if err != nil {
 		return nil, err
+	} else {
+		wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
 	}
 
 	// TODO inspect claims
