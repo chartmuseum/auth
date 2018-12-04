@@ -54,8 +54,8 @@ type (
 		Issuer           string
 		Username         string
 		Password         string
-		PublicCert       []byte
-		PublicCertPath   string
+		PublicKey        []byte
+		PublicKeyPath    string
 		AnonymousActions []string
 	}
 
@@ -87,8 +87,8 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 		authorizer.Issuer = opts.Issuer
 
 		tokenDecoder, err := NewTokenDecoder(&TokenDecoderOptions{
-			PublicCert:     opts.PublicCert,
-			PublicCertPath: opts.PublicCertPath,
+			PublicKey:     opts.PublicKey,
+			PublicKeyPath: opts.PublicKeyPath,
 		})
 		if err != nil {
 			return nil, err
@@ -152,7 +152,7 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 		claims, err := getTokenCustomClaims(token)
 		if err == nil {
 			for _, entry := range claims.Access {
-				if entry.Type == DefaultAccessEntryType {
+				if entry.Type == AccessEntryType {
 					if entry.Name == namespace {
 						for _, act := range entry.Actions {
 							if act == action {

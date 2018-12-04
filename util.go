@@ -40,8 +40,8 @@ func generateBasicAuthHeader(username string, password string) string {
 	return basicAuthHeader
 }
 
-func generatePublicKey(publicCertPath string, publicCert []byte) (*rsa.PublicKey, error) {
-	pem, err := getPemFromPathOrCert(publicCertPath, publicCert)
+func generatePublicKey(publicKeyPath string, publicKey []byte) (*rsa.PublicKey, error) {
+	pem, err := getPemFromPathOrKey(publicKeyPath, publicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -50,8 +50,8 @@ func generatePublicKey(publicCertPath string, publicCert []byte) (*rsa.PublicKey
 	return jwt.ParseRSAPublicKeyFromPEM(pem)
 }
 
-func generatePrivateKey(privateCertPath string, privateCert []byte) (*rsa.PrivateKey, error) {
-	pem, err := getPemFromPathOrCert(privateCertPath, privateCert)
+func generatePrivateKey(privateKeyPath string, privateKey []byte) (*rsa.PrivateKey, error) {
+	pem, err := getPemFromPathOrKey(privateKeyPath, privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -59,17 +59,17 @@ func generatePrivateKey(privateCertPath string, privateCert []byte) (*rsa.Privat
 	return jwt.ParseRSAPrivateKeyFromPEM(pem)
 }
 
-func getPemFromPathOrCert(certPath string, cert []byte) ([]byte, error) {
+func getPemFromPathOrKey(keyPath string, key []byte) ([]byte, error) {
 	var pem []byte
 	var err error
 
-	if certPath != "" {
-		pem, err = ioutil.ReadFile(certPath)
+	if keyPath != "" {
+		pem, err = ioutil.ReadFile(keyPath)
 		if err != nil {
 			return nil, err
 		}
-	} else if cert != nil {
-		pem = cert
+	} else if key != nil {
+		pem = key
 	} else {
 		return nil, errors.New("must supply either cert path or cert")
 	}

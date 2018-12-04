@@ -28,7 +28,7 @@ func main() {
 	// This should be the private key associated with the public key used
 	// in ChartMuseum server configuration (server.pem)
 	cmTokenGenerator, err := cmAuth.NewTokenGenerator(&cmAuth.TokenGeneratorOptions{
-		PrivateCertPath: "./testdata/server.key",
+		PrivateKeyPath: "./testdata/server.key",
 	})
 	if err != nil {
 		panic(err)
@@ -40,7 +40,7 @@ func main() {
 	access := []cmAuth.AccessEntry{
 		{
 			Name:    "org1/repo1",
-			Type:    cmAuth.DefaultAccessEntryType,
+			Type:    cmAuth.AccessEntryType,
 			Actions: []string{cmAuth.PushAction},
 		},
 	}

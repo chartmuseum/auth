@@ -49,7 +49,7 @@ type AuthorizationTestSuite struct {
 func (suite *AuthorizationTestSuite) SetupSuite() {
 	var err error
 
-	generator, err := NewTokenGenerator(&TokenGeneratorOptions{PrivateCertPath: testPrivateKey})
+	generator, err := NewTokenGenerator(&TokenGeneratorOptions{PrivateKeyPath: testPrivateKey})
 	suite.Nil(err)
 
 	suite.TokenGenerator = generator
@@ -78,21 +78,21 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.Nil(err)
 
 	suite.BearerAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:          "cm-test-realm",
-		PublicCertPath: testPublicKey,
+		Realm:         "cm-test-realm",
+		PublicKeyPath: testPublicKey,
 	})
 	suite.Nil(err)
 
 	suite.BearerAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 		Realm:            "cm-test-realm",
-		PublicCertPath:   testPublicKey,
+		PublicKeyPath:    testPublicKey,
 		AnonymousActions: []string{PullAction},
 	})
 	suite.Nil(err)
 
 	suite.BearerAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 		Realm:            "cm-test-realm",
-		PublicCertPath:   testPublicKey,
+		PublicKeyPath:    testPublicKey,
 		AnonymousActions: []string{PullAction, PushAction},
 	})
 	suite.Nil(err)
@@ -103,6 +103,7 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.BasicGoodAuthorizationHeader = generateBasicAuthHeader("cm-test-user", "cm-test-pass")
 	suite.BasicExpectedWWWAuthHeader = "Basic realm=\"cm-test-realm\""
 	suite.BearerPullScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
+	suite.BearerPushScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
 	suite.BearerPushScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
 }
 
@@ -192,7 +193,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	access := []AccessEntry{
 		{
 			Name:    "",
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
 	}
@@ -208,17 +209,17 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	access = []AccessEntry{
 		{
 			Name:    "",
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
 		{
 			Name:    "org1/repo1",
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
 		{
 			Name:    "org1/repo2",
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{PullAction, PushAction},
 		},
 	}
@@ -260,7 +261,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	access = []AccessEntry{
 		{
 			Name:    "",
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
 	}
@@ -294,7 +295,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	access = []AccessEntry{
 		{
 			Name:    "",
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{},
 		},
 	}

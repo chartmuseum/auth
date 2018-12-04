@@ -23,8 +23,7 @@ import (
 )
 
 const (
-	DefaultAccessEntryType = "helm-repository"
-	DefaultExpiration      = time.Minute * 5
+	AccessEntryType = "artifact-repository"
 )
 
 type (
@@ -44,8 +43,8 @@ type (
 	}
 
 	TokenGeneratorOptions struct {
-		PrivateCert     []byte
-		PrivateCertPath string
+		PrivateKey     []byte
+		PrivateKeyPath string
 	}
 
 	TokenDecoder struct {
@@ -53,13 +52,13 @@ type (
 	}
 
 	TokenDecoderOptions struct {
-		PublicCert     []byte
-		PublicCertPath string
+		PublicKey     []byte
+		PublicKeyPath string
 	}
 )
 
 func NewTokenGenerator(opts *TokenGeneratorOptions) (*TokenGenerator, error) {
-	privateKey, err := generatePrivateKey(opts.PrivateCertPath, opts.PrivateCert)
+	privateKey, err := generatePrivateKey(opts.PrivateKeyPath, opts.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +84,7 @@ func (tokenGenerator *TokenGenerator) GenerateToken(access []AccessEntry, expira
 }
 
 func NewTokenDecoder(opts *TokenDecoderOptions) (*TokenDecoder, error) {
-	publicKey, err := generatePublicKey(opts.PublicCertPath, opts.PublicCert)
+	publicKey, err := generatePublicKey(opts.PublicKeyPath, opts.PublicKey)
 	if err != nil {
 		return nil, err
 	}

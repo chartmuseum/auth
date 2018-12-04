@@ -20,6 +20,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 )
 
 type TokenTestSuite struct {
@@ -41,7 +42,7 @@ func (suite *TokenTestSuite) TearDownSuite() {
 
 func (suite *TokenTestSuite) TestGenerateToken() {
 	generator, err := NewTokenGenerator(&TokenGeneratorOptions{
-		PrivateCertPath: testPrivateKey,
+		PrivateKeyPath: testPrivateKey,
 	})
 	suite.Nil(err)
 
@@ -49,16 +50,16 @@ func (suite *TokenTestSuite) TestGenerateToken() {
 	access := []AccessEntry{
 		{
 			Name:    namespace,
-			Type:    DefaultAccessEntryType,
+			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
 	}
 
-	signedString, err := generator.GenerateToken(access, DefaultExpiration)
+	signedString, err := generator.GenerateToken(access, time.Minute*5)
 	suite.Nil(err)
 
 	decoder, err := NewTokenDecoder(&TokenDecoderOptions{
-		PublicCertPath: testPublicKey,
+		PublicKeyPath: testPublicKey,
 	})
 	suite.Nil(err)
 
