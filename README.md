@@ -10,6 +10,8 @@ Go library for generating [ChartMuseum](https://github.com/helm/chartmuseum) JWT
 
 ### Generating a JWT token (example)
 
+[Source](./testcmd/getjwt/main.go)
+
 Clone this repo and run `make getjwt` to run this example
 
 ```go
