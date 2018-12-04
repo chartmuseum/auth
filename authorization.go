@@ -20,86 +20,122 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
+	"github.com/pkg/errors"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"strings"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 )
-
-type (
-	// Router handles all incoming HTTP requests
-	Router struct {
-		BasicAuthHeader  string
-		BearerAuthHeader string
-		AnonymousGet     bool
-		AuthRealm        string
-		AuthService      string
-		AuthIssuer       string
-		AuthPublicCert   []byte
-	}
-
-	// Authorization is TODO
-	Authorization struct {
-		Authorized            bool
-		WWWAuthenticateHeader string
-	}
-
-	// Authorizer is a generic interface for authorizers
-	Authorizer interface {
-		Authorize(authHeader string, action string, repo string) (*Authorization, error)
-	}
-
-	// BasicAuthAuthorizer is TODO
-	BasicAuthAuthorizer struct {
-		Realm                string
-		BasicAuthMatchHeader string
-		AnonymousActions     []string
-	}
-
-	// BasicAuthAuthorizerOptions is TODO
-	BasicAuthAuthorizerOptions struct {
-		Realm            string
-		Username         string
-		Password         string
-		AnonymousActions []string
-	}
-)
-
-func NewBasicAuthAuthorizer(opts *BasicAuthAuthorizerOptions) *BasicAuthAuthorizer {
-	basicAuthAuthorizer := BasicAuthAuthorizer{
-		Realm:                opts.Realm,
-		BasicAuthMatchHeader: generateBasicAuthHeader(opts.Username, opts.Password),
-		AnonymousActions:     opts.AnonymousActions,
-	}
-	return &basicAuthAuthorizer
-}
-
-func (authorizer *BasicAuthAuthorizer) Authorize(authHeader string, action string, repo string) (*Authorization, error) {
-	var authorized bool
-	var wwwAuthenticateHeader string
-
-	if containsAction(authorizer.AnonymousActions, action) {
-		authorized = true
-	} else if authHeader == authorizer.BasicAuthMatchHeader {
-		authorized = true
-	} else {
-		wwwAuthenticateHeader = fmt.Sprintf("Basic realm=\"%s\"", authorizer.Realm)
-	}
-
-	authorization := Authorization{
-		Authorized:            authorized,
-		WWWAuthenticateHeader: wwwAuthenticateHeader,
-	}
-
-	return &authorization, nil
-}
 
 const (
 	PullAction = "pull"
 	PushAction = "push"
 )
+
+var (
+	BasicAuthAuthorizerType  AuthorizerType = "basic"
+	BearerAuthAuthorizerType AuthorizerType = "bearer"
+)
+
+type (
+	AuthorizerType string
+
+	// Authorizer is a generic interface for authorizers
+	Authorizer struct {
+		Type                 AuthorizerType
+		Realm                string
+		Service              string
+		Issuer               string
+		BasicAuthMatchHeader string
+		PublicCert           []byte
+		AnonymousActions     []string
+	}
+
+	// BasicAuthAuthorizerOptions is TODO
+	AuthorizerOptions struct {
+		Realm            string
+		Service          string
+		Issuer           string
+		Username         string
+		Password         string
+		PublicCert       []byte
+		PublicCertPath   []byte
+		AnonymousActions []string
+	}
+
+	// Permission is TODO
+	Permission struct {
+		Allowed               bool
+		WWWAuthenticateHeader string
+	}
+)
+
+func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
+	authorizer := Authorizer{
+		Realm:            opts.Realm,
+		AnonymousActions: opts.AnonymousActions,
+	}
+
+	if opts.Username != "" && opts.Password != "" {
+		authorizer.Type = BasicAuthAuthorizerType
+		authorizer.BasicAuthMatchHeader = generateBasicAuthHeader(opts.Username, opts.Password)
+	} else {
+		authorizer.Type = BearerAuthAuthorizerType
+		authorizer.Service = opts.Service
+		authorizer.Issuer = opts.Issuer
+	}
+
+	return &authorizer, nil
+}
+
+func (authorizer *Authorizer) Authorize(authHeader string, action string, repo string) (*Permission, error) {
+	if authorizer.Type == BasicAuthAuthorizerType {
+		return authorizer.authorizeBasicAuth(authHeader, action, repo)
+	} else if authorizer.Type == BearerAuthAuthorizerType {
+		return authorizer.authorizeBearerAuth(authHeader, action, repo)
+	}
+	return nil, errors.New(fmt.Sprintf("unknown authorizer type: %s", authorizer.Type))
+}
+
+func (authorizer *Authorizer) authorizeBasicAuth(authHeader string, action string, repo string) (*Permission, error) {
+	var allowed bool
+	var wwwAuthenticateHeader string
+
+	if containsAction(authorizer.AnonymousActions, action) {
+		allowed = true
+	} else if authHeader == authorizer.BasicAuthMatchHeader {
+		allowed = true
+	} else {
+		wwwAuthenticateHeader = fmt.Sprintf("Basic realm=\"%s\"", authorizer.Realm)
+	}
+
+	permission := Permission{
+		Allowed:               allowed,
+		WWWAuthenticateHeader: wwwAuthenticateHeader,
+	}
+
+	return &permission, nil
+}
+
+func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action string, repo string) (*Permission, error) {
+	var allowed bool
+	var wwwAuthenticateHeader string
+
+	splitToken := strings.Split(authHeader, "Bearer ")
+	_, isValid := validateJWT(splitToken[1], authorizer.PublicCert)
+	if isValid {
+		allowed = true
+	} else {
+		wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
+	}
+
+	permission := Permission{
+		Allowed:               allowed,
+		WWWAuthenticateHeader: wwwAuthenticateHeader,
+	}
+
+	return &permission, nil
+}
 
 func containsAction(actionsList []string, action string) bool {
 	for _, a := range actionsList {
@@ -116,53 +152,13 @@ func generateBasicAuthHeader(username string, password string) string {
 	return basicAuthHeader
 }
 
-func (router *Router) authorizeRequest(request *http.Request) (bool, map[string]string) {
-	authorized := false
-	responseHeaders := map[string]string{}
-
-	// BasicAuthHeader is only set on the router if ChartMuseum is configured to use
-	// basic auth protection. If not set, the server and all its routes are wide open.
-	if router.BasicAuthHeader != "" {
-		if router.AnonymousGet && request.Method == "GET" {
-			authorized = true
-		} else if request.Header.Get("Authorization") == router.BasicAuthHeader {
-			authorized = true
-		} else {
-			responseHeaders["WWW-Authenticate"] = "Basic realm=\"ChartMuseum\""
-		}
-	} else if router.BearerAuthHeader != "" {
-		// used to escape spaces in service name
-		queryString := url.PathEscape("service=" + router.AuthService)
-
-		if router.AnonymousGet && request.Method == "GET" {
-			authorized = true
-		} else {
-			if request.Header.Get("Authorization") != "" {
-				splitToken := strings.Split(request.Header.Get("Authorization"), "Bearer ")
-				_, isValid := validateJWT(splitToken[1], router)
-				if isValid {
-					authorized = true
-				} else {
-					responseHeaders["WWW-Authenticate"] = "Bearer realm=\"" + router.AuthRealm + "?" + queryString + "\""
-				}
-			} else {
-				responseHeaders["WWW-Authenticate"] = "Bearer realm=\"" + router.AuthRealm + "?" + queryString + "\""
-			}
-		}
-	} else {
-		authorized = true
-	}
-
-	return authorized, responseHeaders
-}
-
 // verify if JWT is valid by using the rsa public certificate pem
 // currently this only works with RSA key signing
 // TODO: how best to handle many different signing algorithms?
-func validateJWT(t string, router *Router) (*jwt.Token, bool) {
+func validateJWT(t string, publicCert []byte) (*jwt.Token, bool) {
 	valid := false
 
-	key, err := getRSAKey(router.AuthPublicCert)
+	key, err := getRSAKey(publicCert)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -191,10 +187,10 @@ func getRSAKey(key []byte) (*rsa.PublicKey, error) {
 
 // Load authorization server public pem file
 // TODO: have this be fetched from a url instead of file
-func loadPublicCertFromFile(certPath string, router *Router) {
+func loadPublicCertFromFile(certPath string) []byte {
 	publicKey, err := ioutil.ReadFile(certPath)
 	if err != nil {
 		panic(err)
 	}
-	router.AuthPublicCert = publicKey
+	return publicKey
 }

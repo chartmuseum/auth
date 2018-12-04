@@ -24,30 +24,37 @@ import (
 
 type AuthorizationTestSuite struct {
 	suite.Suite
-	BasicAuthAuthorizer              Authorizer
-	BasicAuthAnonymousPullAuthorizer Authorizer
-	BasicAuthAnonymousPushAuthorizer Authorizer
+	BasicAuthAuthorizer              *Authorizer
+	BasicAuthAnonymousPullAuthorizer *Authorizer
+	BasicAuthAnonymousPushAuthorizer *Authorizer
 }
 
 func (suite *AuthorizationTestSuite) SetupSuite() {
-	suite.BasicAuthAuthorizer = Authorizer(NewBasicAuthAuthorizer(&BasicAuthAuthorizerOptions{
+	var err error
+
+	suite.BasicAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 		Realm:        "cm-test-realm",
 		Username:     "cm-test-user",
 		Password:     "cm-test-pass",
 		AnonymousActions: []string{},
-	}))
-	suite.BasicAuthAnonymousPullAuthorizer = Authorizer(NewBasicAuthAuthorizer(&BasicAuthAuthorizerOptions{
+	})
+	suite.Nil(err)
+
+	suite.BasicAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 		Realm:        "cm-test-realm",
 		Username:     "cm-test-user",
 		Password:     "cm-test-pass",
 		AnonymousActions: []string{PullAction},
-	}))
-	suite.BasicAuthAnonymousPushAuthorizer = Authorizer(NewBasicAuthAuthorizer(&BasicAuthAuthorizerOptions{
+	})
+	suite.Nil(err)
+
+	suite.BasicAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 		Realm:        "cm-test-realm",
 		Username:     "cm-test-user",
 		Password:     "cm-test-pass",
 		AnonymousActions: []string{PullAction, PushAction},
-	}))
+	})
+	suite.Nil(err)
 }
 
 func (suite *AuthorizationTestSuite) TearDownSuite() {
@@ -55,7 +62,7 @@ func (suite *AuthorizationTestSuite) TearDownSuite() {
 }
 
 func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
-	var authorization *Authorization
+	var permission *Permission
 	var err error
 
 	badAuthorizationHeader := generateBasicAuthHeader("cm-test-baduser", "cm-test-badpass")
@@ -64,45 +71,45 @@ func (suite *AuthorizationTestSuite) TestAuthorizeRequest() {
 	expectedWWWAuthHeader := "Basic realm=\"cm-test-realm\""
 
 	// No username/password
-	authorization, err = suite.BasicAuthAuthorizer.Authorize("", PullAction, "")
-	suite.False(authorization.Authorized)
-	suite.Equal(expectedWWWAuthHeader, authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAuthorizer.Authorize("", PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(expectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Bad username/password
-	authorization, err = suite.BasicAuthAuthorizer.Authorize(badAuthorizationHeader, PullAction, "")
-	suite.False(authorization.Authorized)
-	suite.Equal(expectedWWWAuthHeader, authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAuthorizer.Authorize(badAuthorizationHeader, PullAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(expectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Correct username/password
-	authorization, err = suite.BasicAuthAuthorizer.Authorize(goodAuthorizationHeader, PullAction, "")
-	suite.True(authorization.Authorized)
-	suite.Equal("", authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAuthorizer.Authorize(goodAuthorizationHeader, PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Pull, no username/password (GET/PullAction)
-	authorization, err = suite.BasicAuthAnonymousPullAuthorizer.Authorize("", PullAction, "")
-	suite.True(authorization.Authorized)
-	suite.Equal("", authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAnonymousPullAuthorizer.Authorize("", PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Pull, no username/password (POST/PushAction)
-	authorization, err = suite.BasicAuthAnonymousPullAuthorizer.Authorize("", PushAction, "")
-	suite.False(authorization.Authorized)
-	suite.Equal(expectedWWWAuthHeader, authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAnonymousPullAuthorizer.Authorize("", PushAction, "")
+	suite.False(permission.Allowed)
+	suite.Equal(expectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Push, no username/password (GET/PullAction)
-	authorization, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PullAction, "")
-	suite.True(authorization.Authorized)
-	suite.Equal("", authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	// Anonymous Push, no username/password (POST/PushAction)
-	authorization, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PushAction, "")
-	suite.True(authorization.Authorized)
-	suite.Equal("", authorization.WWWAuthenticateHeader)
+	permission, err = suite.BasicAuthAnonymousPushAuthorizer.Authorize("", PushAction, "")
+	suite.True(permission.Allowed)
+	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 }
 
