@@ -38,16 +38,17 @@ var (
 )
 
 type (
+	// AuthorizerType is TODO
 	AuthorizerType string
 
-	// Authorizer is a generic interface for authorizers
+	// Authorizer is TODO
 	Authorizer struct {
 		Type                 AuthorizerType
 		Realm                string
 		Service              string
 		Issuer               string
 		BasicAuthMatchHeader string
-		PublicCert           []byte
+		PublicKey            *rsa.PublicKey
 		AnonymousActions     []string
 	}
 
@@ -59,7 +60,7 @@ type (
 		Username         string
 		Password         string
 		PublicCert       []byte
-		PublicCertPath   []byte
+		PublicCertPath   string
 		AnonymousActions []string
 	}
 
@@ -70,6 +71,7 @@ type (
 	}
 )
 
+// NewAuthorizer is TODO
 func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 	authorizer := Authorizer{
 		Realm:            opts.Realm,
@@ -77,33 +79,55 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 	}
 
 	if opts.Username != "" && opts.Password != "" {
+
+		// Basic
 		authorizer.Type = BasicAuthAuthorizerType
 		authorizer.BasicAuthMatchHeader = generateBasicAuthHeader(opts.Username, opts.Password)
+
 	} else {
+
+		// Bearer
 		authorizer.Type = BearerAuthAuthorizerType
 		authorizer.Service = opts.Service
 		authorizer.Issuer = opts.Issuer
+
+		publicKey, err := generatePublicKey(opts.PublicCertPath, opts.PublicCert)
+		if err != nil {
+			return nil, err
+		}
+
+		authorizer.PublicKey = publicKey
 	}
 
 	return &authorizer, nil
 }
 
 func (authorizer *Authorizer) Authorize(authHeader string, action string, repo string) (*Permission, error) {
-	if authorizer.Type == BasicAuthAuthorizerType {
-		return authorizer.authorizeBasicAuth(authHeader, action, repo)
+	if containsAction(authorizer.AnonymousActions, action) {
+
+		// Anonymous action allowed (set in AuthorizerOptions)
+		return &Permission{Allowed: true}, nil
+
+	} else if authorizer.Type == BasicAuthAuthorizerType {
+
+		// Basic
+		return authorizer.authorizeBasicAuth(authHeader)
+
 	} else if authorizer.Type == BearerAuthAuthorizerType {
+
+		// Bearer
 		return authorizer.authorizeBearerAuth(authHeader, action, repo)
 	}
+
 	return nil, errors.New(fmt.Sprintf("unknown authorizer type: %s", authorizer.Type))
 }
 
-func (authorizer *Authorizer) authorizeBasicAuth(authHeader string, action string, repo string) (*Permission, error) {
+// Basic
+func (authorizer *Authorizer) authorizeBasicAuth(authHeader string) (*Permission, error) {
 	var allowed bool
 	var wwwAuthenticateHeader string
 
-	if containsAction(authorizer.AnonymousActions, action) {
-		allowed = true
-	} else if authHeader == authorizer.BasicAuthMatchHeader {
+	if authHeader == authorizer.BasicAuthMatchHeader {
 		allowed = true
 	} else {
 		wwwAuthenticateHeader = fmt.Sprintf("Basic realm=\"%s\"", authorizer.Realm)
@@ -117,17 +141,21 @@ func (authorizer *Authorizer) authorizeBasicAuth(authHeader string, action strin
 	return &permission, nil
 }
 
+// Bearer
 func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action string, repo string) (*Permission, error) {
 	var allowed bool
 	var wwwAuthenticateHeader string
 
+	// TODO check length of splitToken / enhance
 	splitToken := strings.Split(authHeader, "Bearer ")
-	_, isValid := validateJWT(splitToken[1], authorizer.PublicCert)
-	if isValid {
-		allowed = true
-	} else {
-		wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
+	_, err := validateJWT(splitToken[1], authorizer.PublicKey)
+	if err != nil {
+		return nil, err
 	}
+
+	// TODO inspect claims
+	allowed = true
+	//wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
 
 	permission := Permission{
 		Allowed:               allowed,
@@ -146,6 +174,25 @@ func containsAction(actionsList []string, action string) bool {
 	return false
 }
 
+func generatePublicKey(publicCertPath string, publicCert []byte) (*rsa.PublicKey, error) {
+	var pem []byte
+
+	if publicCertPath != "" {
+		var err error
+		pem, err = ioutil.ReadFile(publicCertPath)
+		if err != nil {
+			return nil, err
+		}
+	} else if publicCert != nil {
+		pem = publicCert
+	} else {
+		return nil, errors.New("Must supply either PublicCertPath or PublicCert")
+	}
+
+	// https://github.com/dgrijalva/jwt-go/blob/master/rsa_test.go
+	return jwt.ParseRSAPublicKeyFromPEM(pem)
+}
+
 func generateBasicAuthHeader(username string, password string) string {
 	base := username + ":" + password
 	basicAuthHeader := "Basic " + base64.StdEncoding.EncodeToString([]byte(base))
@@ -155,42 +202,13 @@ func generateBasicAuthHeader(username string, password string) string {
 // verify if JWT is valid by using the rsa public certificate pem
 // currently this only works with RSA key signing
 // TODO: how best to handle many different signing algorithms?
-func validateJWT(t string, publicCert []byte) (*jwt.Token, bool) {
-	valid := false
-
-	key, err := getRSAKey(publicCert)
-	if err != nil {
-		fmt.Println(err)
-	}
-
+func validateJWT(t string, key *rsa.PublicKey) (*jwt.Token, error) {
 	token, err := jwt.Parse(t, func(token *jwt.Token) (interface{}, error) {
 		return key, nil
 	})
 	if err != nil {
-		fmt.Println("Token parse error: ", err)
-	} else {
-		fmt.Println("token is valid")
-		valid = true
-	}
-	return token, valid
-}
-
-// https://github.com/dgrijalva/jwt-go/blob/master/rsa_test.go
-func getRSAKey(key []byte) (*rsa.PublicKey, error) {
-	parsedKey, err := jwt.ParseRSAPublicKeyFromPEM(key)
-	if err != nil {
-		fmt.Println("error parsing RSA key from PEM: ", err)
+		return nil, err
 	}
 
-	return parsedKey, nil
-}
-
-// Load authorization server public pem file
-// TODO: have this be fetched from a url instead of file
-func loadPublicCertFromFile(certPath string) []byte {
-	publicKey, err := ioutil.ReadFile(certPath)
-	if err != nil {
-		panic(err)
-	}
-	return publicKey
+	return token, nil
 }

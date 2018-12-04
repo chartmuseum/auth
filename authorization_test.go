@@ -24,34 +24,63 @@ import (
 
 type AuthorizationTestSuite struct {
 	suite.Suite
+
 	BasicAuthAuthorizer              *Authorizer
 	BasicAuthAnonymousPullAuthorizer *Authorizer
 	BasicAuthAnonymousPushAuthorizer *Authorizer
+
+	BearerAuthAuthorizer              *Authorizer
+	BearerAuthAnonymousPullAuthorizer *Authorizer
+	BearerAuthAnonymousPushAuthorizer *Authorizer
 }
+
+var (
+	testPrivateKey = "./testdata/server.key"
+	testPublicKey = "./testdata/server.pem"
+)
 
 func (suite *AuthorizationTestSuite) SetupSuite() {
 	var err error
 
 	suite.BasicAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:        "cm-test-realm",
-		Username:     "cm-test-user",
-		Password:     "cm-test-pass",
-		AnonymousActions: []string{},
+		Realm:            "cm-test-realm",
+		Username:         "cm-test-user",
+		Password:         "cm-test-pass",
 	})
 	suite.Nil(err)
 
 	suite.BasicAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:        "cm-test-realm",
-		Username:     "cm-test-user",
-		Password:     "cm-test-pass",
+		Realm:            "cm-test-realm",
+		Username:         "cm-test-user",
+		Password:         "cm-test-pass",
 		AnonymousActions: []string{PullAction},
 	})
 	suite.Nil(err)
 
 	suite.BasicAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:        "cm-test-realm",
-		Username:     "cm-test-user",
-		Password:     "cm-test-pass",
+		Realm:            "cm-test-realm",
+		Username:         "cm-test-user",
+		Password:         "cm-test-pass",
+		AnonymousActions: []string{PullAction, PushAction},
+	})
+	suite.Nil(err)
+
+	suite.BearerAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+		Realm: "cm-test-realm",
+		PublicCertPath: testPublicKey,
+	})
+	suite.Nil(err)
+
+	suite.BearerAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+		Realm: "cm-test-realm",
+		PublicCertPath: testPublicKey,
+		AnonymousActions: []string{PullAction},
+	})
+	suite.Nil(err)
+
+	suite.BearerAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+		Realm: "cm-test-realm",
+		PublicCertPath: testPublicKey,
 		AnonymousActions: []string{PullAction, PushAction},
 	})
 	suite.Nil(err)
