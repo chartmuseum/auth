@@ -71,7 +71,7 @@ The decoded payload of this token will look like the following:
   "exp": 1543925949,
   "access": [
     {
-      "type": "helm-repository",
+      "type": "artifact-repository",
       "name": "org1/repo1",
       "actions": [
         "push"
