@@ -28,6 +28,8 @@ const (
 )
 
 var (
+	DefaultNamespace = "repo"
+
 	BasicAuthAuthorizerType  AuthorizerType = "basic"
 	BearerAuthAuthorizerType AuthorizerType = "bearer"
 )
@@ -41,7 +43,6 @@ type (
 		Type                 AuthorizerType
 		Realm                string
 		Service              string
-		Issuer               string
 		BasicAuthMatchHeader string
 		TokenDecoder         *TokenDecoder
 		AnonymousActions     []string
@@ -51,7 +52,6 @@ type (
 	AuthorizerOptions struct {
 		Realm            string
 		Service          string
-		Issuer           string
 		Username         string
 		Password         string
 		PublicKey        []byte
@@ -84,7 +84,6 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 		// Bearer
 		authorizer.Type = BearerAuthAuthorizerType
 		authorizer.Service = opts.Service
-		authorizer.Issuer = opts.Issuer
 
 		tokenDecoder, err := NewTokenDecoder(&TokenDecoderOptions{
 			PublicKey:     opts.PublicKey,
@@ -170,7 +169,11 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	}
 
 	if !allowed {
-		wwwAuthenticateHeader = "Bearer realm=\"" + authorizer.Realm + "\""
+		if namespace == "" {
+			namespace = DefaultNamespace
+		}
+		wwwAuthenticateHeader = fmt.Sprintf("Bearer realm=\"%s\",service=\"%s\",scope=\"%s:%s:%s\"",
+			authorizer.Realm, authorizer.Service, AccessEntryType, namespace, action)
 	}
 
 	permission := Permission{

@@ -31,7 +31,8 @@ func main() {
 	authHeader := fmt.Sprintf("Bearer %s", signedString)
 
 	cmAuthorizer, err := cmAuth.NewAuthorizer(&cmAuth.AuthorizerOptions{
-		Realm:         "cm-test-realm",
+		Realm:         "https://my.site.io/oauth2/token",
+		Service:       "my.site.io",
 		PublicKeyPath: "./testdata/server.pem",
 	})
 	if err != nil {

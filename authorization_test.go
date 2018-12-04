@@ -18,6 +18,7 @@ package auth
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,14 +56,14 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.TokenGenerator = generator
 
 	suite.BasicAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:    "cm-test-realm",
+		Realm:    "https://my.site.io/oauth2/token",
 		Username: "cm-test-user",
 		Password: "cm-test-pass",
 	})
 	suite.Nil(err)
 
 	suite.BasicAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:            "cm-test-realm",
+		Realm:            "https://my.site.io/oauth2/token",
 		Username:         "cm-test-user",
 		Password:         "cm-test-pass",
 		AnonymousActions: []string{PullAction},
@@ -70,7 +71,7 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.Nil(err)
 
 	suite.BasicAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:            "cm-test-realm",
+		Realm:            "https://my.site.io/oauth2/token",
 		Username:         "cm-test-user",
 		Password:         "cm-test-pass",
 		AnonymousActions: []string{PullAction, PushAction},
@@ -78,20 +79,23 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.Nil(err)
 
 	suite.BearerAuthAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:         "cm-test-realm",
+		Realm:         "https://my.site.io/oauth2/token",
+		Service:       "my.site.io",
 		PublicKeyPath: testPublicKey,
 	})
 	suite.Nil(err)
 
 	suite.BearerAuthAnonymousPullAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:            "cm-test-realm",
+		Realm:            "https://my.site.io/oauth2/token",
+		Service:          "my.site.io",
 		PublicKeyPath:    testPublicKey,
 		AnonymousActions: []string{PullAction},
 	})
 	suite.Nil(err)
 
 	suite.BearerAuthAnonymousPushAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
-		Realm:            "cm-test-realm",
+		Realm:            "https://my.site.io/oauth2/token",
+		Service:          "my.site.io",
 		PublicKeyPath:    testPublicKey,
 		AnonymousActions: []string{PullAction, PushAction},
 	})
@@ -101,10 +105,11 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 
 	suite.BasicBadAuthorizationHeader = generateBasicAuthHeader("cm-test-baduser", "cm-test-badpass")
 	suite.BasicGoodAuthorizationHeader = generateBasicAuthHeader("cm-test-user", "cm-test-pass")
-	suite.BasicExpectedWWWAuthHeader = "Basic realm=\"cm-test-realm\""
-	suite.BearerPullScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
-	suite.BearerPushScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
-	suite.BearerPushScopeExpectedWWWAuthHeader = "Bearer realm=\"cm-test-realm\""
+	suite.BasicExpectedWWWAuthHeader = "Basic realm=\"https://my.site.io/oauth2/token\""
+	suite.BearerPullScopeExpectedWWWAuthHeader =
+		"Bearer realm=\"https://my.site.io/oauth2/token\",service=\"my.site.io\",scope=\"artifact-repository:repo:pull\""
+	suite.BearerPushScopeExpectedWWWAuthHeader =
+		"Bearer realm=\"https://my.site.io/oauth2/token\",service=\"my.site.io\",scope=\"artifact-repository:repo:push\""
 }
 
 func (suite *AuthorizationTestSuite) TearDownSuite() {
@@ -113,7 +118,7 @@ func (suite *AuthorizationTestSuite) TearDownSuite() {
 
 func (suite *AuthorizationTestSuite) TestNewAuthorizer() {
 	authorizer, err := NewAuthorizer(&AuthorizerOptions{
-		Realm: "cm-test-realm",
+		Realm: "https://my.site.io/oauth2/token",
 	})
 	suite.Nil(authorizer)
 	suite.NotNil(err)
@@ -123,7 +128,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBasicRequest() {
 	var permission *Permission
 	var err error
 
-	expectedWWWAuthHeader := "Basic realm=\"cm-test-realm\""
+	expectedWWWAuthHeader := "Basic realm=\"https://my.site.io/oauth2/token\""
 
 	// Unknown authorizer type returns err
 	permission, err = suite.UnknownTypeAuthorizer.Authorize(suite.BasicGoodAuthorizationHeader, PullAction, "")
@@ -192,7 +197,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	// Valid token
 	access := []AccessEntry{
 		{
-			Name:    "",
+			Name:    DefaultNamespace,
 			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
@@ -200,7 +205,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader := fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
 	suite.True(permission.Allowed)
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -208,7 +213,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	// Namespace checks
 	access = []AccessEntry{
 		{
-			Name:    "",
+			Name:    DefaultNamespace,
 			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
@@ -227,7 +232,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
 
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
 	suite.True(permission.Allowed)
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -242,14 +247,15 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "")
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, DefaultNamespace)
 	suite.False(permission.Allowed)
-	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Equal(suite.BearerPushScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "org1/repo1")
 	suite.False(permission.Allowed)
-	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	expectedWWWAuthHeaderRepo1 := strings.Replace(suite.BearerPushScopeExpectedWWWAuthHeader, ":repo:", ":org1/repo1:", 1)
+	suite.Equal(expectedWWWAuthHeaderRepo1, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
 	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "org1/repo2")
@@ -260,7 +266,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	// Expired Token
 	access = []AccessEntry{
 		{
-			Name:    "",
+			Name:    DefaultNamespace,
 			Type:    AccessEntryType,
 			Actions: []string{PullAction},
 		},
@@ -270,7 +276,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	fmt.Println("Sleeping for 2 seconds to test token expiration...")
 	time.Sleep(time.Second * 2)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -278,7 +284,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	// Token entry type is not recognized
 	access = []AccessEntry{
 		{
-			Name:    "",
+			Name:    DefaultNamespace,
 			Type:    "fake-type",
 			Actions: []string{PullAction},
 		},
@@ -286,7 +292,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -294,7 +300,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	// Token entry does not have action requested
 	access = []AccessEntry{
 		{
-			Name:    "",
+			Name:    DefaultNamespace,
 			Type:    AccessEntryType,
 			Actions: []string{},
 		},
@@ -302,7 +308,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)

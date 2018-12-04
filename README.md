@@ -165,7 +165,8 @@ func main() {
 	authHeader := fmt.Sprintf("Bearer %s", signedString)
 
 	cmAuthorizer, err := cmAuth.NewAuthorizer(&cmAuth.AuthorizerOptions{
-		Realm:         "cm-test-realm",
+		Realm:         "https://my.site.io/oauth2/token",
+		Service:       "my.site.io",
 		PublicKeyPath: "./testdata/server.pem",
 	})
 	if err != nil {
@@ -189,6 +190,12 @@ func main() {
 		fmt.Println(fmt.Sprintf("WWW-Authenticate: %s", permissions.WWWAuthenticateHeader))
 	}
 }
+```
+
+If access denied, the `WWW-Authenticate` header returned will resemble the following:
+
+```
+WWW-Authenticate: Bearer realm="https://my.site.io/oauth2/token",service="my.site.io",scope="artifact-repository:org1/repo1:push"
 ```
 
 ## Supported JWT Signing Algorithms
