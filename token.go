@@ -75,6 +75,9 @@ func (tokenGenerator *TokenGenerator) GenerateToken(access []AccessEntry, expira
 	token := jwt.New(jwt.SigningMethodRS256)
 	standardClaims := jwt.StandardClaims{}
 
+	now := time.Now()
+	standardClaims.IssuedAt = now.Unix()
+
 	if expiration > 0 {
 		standardClaims.ExpiresAt = time.Now().Add(expiration).Unix()
 	}
