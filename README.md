@@ -38,7 +38,7 @@ func main() {
 		{
 			Name:    "org1/repo1",
 			Type:    cmAuth.DefaultAccessEntryType,
-			Actions: []string{cmAuth.PullAction},
+			Actions: []string{cmAuth.PushAction},
 		},
 	}
 	token, err := cmTokenGenerator.GenerateToken(access, time.Minute*5)
@@ -46,9 +46,27 @@ func main() {
 		panic(err)
 	}
 
-	// Prints a JWT token which you can use to make requests to ChartMuseum.
-	// You can decode this on http://jwt.io or with something like jwt-cli
+	// Prints a JWT token which you can use to make requests to ChartMuseum
 	fmt.Println(token)
+}
+```
+
+You can decode this token on [jwt.io](http://jwt.io)
+or with something like [jwt-cli](https://github.com/mike-engel/jwt-cli).
+
+The decoded payload of this token will look like the following:
+```json
+{
+  "exp": 1543925949,
+  "access": [
+    {
+      "type": "helm-repository",
+      "name": "org1/repo1",
+      "actions": [
+        "push"
+      ]
+    }
+  ]
 }
 ```
 
