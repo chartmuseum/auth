@@ -45,13 +45,13 @@ func main() {
 			Actions: []string{cmAuth.PushAction},
 		},
 	}
-	token, err := cmTokenGenerator.GenerateToken(access, time.Minute*5)
+	signedString, err := cmTokenGenerator.GenerateToken(access, time.Minute*5)
 	if err != nil {
 		panic(err)
 	}
 
 	// Prints a JWT token which you can use to make requests to ChartMuseum
-	fmt.Println(token)
+	fmt.Println(signedString)
 }
 ```
 
