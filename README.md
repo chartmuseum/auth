@@ -51,7 +51,14 @@ func main() {
 }
 ```
 
-You can decode this token on [jwt.io](http://jwt.io)
+This token will be formatted as a valid JSON Web Token (JWT)
+and resemble the following:
+
+```
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1NDM5MjYzODgsImFjY2VzcyI6W3sidHlwZSI6ImhlbG0tcmVwb3NpdG9yeSIsIm5hbWUiOiJvcmcxL3JlcG8xIiwiYWN0aW9ucyI6WyJwdXNoIl19XX0.lDIEwWTwT_PdIBwYAiJ1HXkpgAKkBiHYqX27i4SL_s9tkDLVoN8wUA0jKvwz322ev7Zm8Hu1oDuYft72vDeJkMDUgSC82d36NNmaWLyKau2GD8qsNFiRV5uwrwvJ4j2B-3NE4xJ-FjTcNYvM4Wn2gSwh1QmPYMekgbpIDcdPPa9lnR5K3KPAThLdhti3dQZ75A_3qRAp9Pw8mByeDUuJA-pEbSKPt4tTyecbJe4XON1Xb_sSI_-hoQkbBS_WhRMvKeSq9AONLYEsL4KG2BEALPDl1FEc1-KJVifLy8oWW-vPBZ3TiPaIA7ysot_gE9CgnF7mWoF8af_aD00W_OgBeg
+```
+
+You can decode this token on [https://jwt.io](http://jwt.io/#id_token=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1NDM5MjYzODgsImFjY2VzcyI6W3sidHlwZSI6ImhlbG0tcmVwb3NpdG9yeSIsIm5hbWUiOiJvcmcxL3JlcG8xIiwiYWN0aW9ucyI6WyJwdXNoIl19XX0.lDIEwWTwT_PdIBwYAiJ1HXkpgAKkBiHYqX27i4SL_s9tkDLVoN8wUA0jKvwz322ev7Zm8Hu1oDuYft72vDeJkMDUgSC82d36NNmaWLyKau2GD8qsNFiRV5uwrwvJ4j2B-3NE4xJ-FjTcNYvM4Wn2gSwh1QmPYMekgbpIDcdPPa9lnR5K3KPAThLdhti3dQZ75A_3qRAp9Pw8mByeDUuJA-pEbSKPt4tTyecbJe4XON1Xb_sSI_-hoQkbBS_WhRMvKeSq9AONLYEsL4KG2BEALPDl1FEc1-KJVifLy8oWW-vPBZ3TiPaIA7ysot_gE9CgnF7mWoF8af_aD00W_OgBeg)
 or with something like [jwt-cli](https://github.com/mike-engel/jwt-cli).
 
 The decoded payload of this token will look like the following:
