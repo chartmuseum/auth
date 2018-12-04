@@ -12,7 +12,7 @@ Go library for generating [ChartMuseum](https://github.com/helm/chartmuseum) JWT
 
 [Source](./testcmd/getjwt/main.go)
 
-Clone this repo and run `make getjwt` to run this example
+Clone this repo and run `go run testcmd/getjwt/main.go` to run this example
 
 ```go
 package main
@@ -92,6 +92,52 @@ passing it in the `Authorization` header:
 > GET /api/charts HTTP/1.1
 > Host: localhost:8080
 > Authorization: Bearer <token>
+```
+
+### Validating a JWT token (example)
+
+[Source](./testcmd/decodejwt/main.go)
+
+Clone this repo and run `go run testcmd/decodejwt/main.go <token>` to run this example
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+
+	cmAuth "github.com/chartmuseum/auth"
+
+	"github.com/dgrijalva/jwt-go"
+)
+
+func main() {
+	signedString := os.Args[1]
+
+	// This should be the public key associated with the private key used
+	// to sign the token
+	cmTokenDecoder, err := cmAuth.NewTokenDecoder(&cmAuth.TokenDecoderOptions{
+		PublicKeyPath: "./testdata/server.pem",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	token, err := cmTokenDecoder.DecodeToken(signedString)
+	if err != nil {
+		panic(err)
+	}
+
+	// Inspect the token claims as JSON
+	c := token.Claims.(jwt.MapClaims)
+	byteData, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(byteData))
+}
 ```
 
 ## Supported JWT Signing Algorithms
