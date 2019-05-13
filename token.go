@@ -45,6 +45,7 @@ type (
 		PrivateKey *rsa.PrivateKey
 		Audience   string
 		Issuer     string
+		KID        string
 	}
 
 	TokenGeneratorOptions struct {
@@ -52,6 +53,7 @@ type (
 		PrivateKeyPath string
 		Audience       string
 		Issuer         string
+		AddKIDHeader   bool
 	}
 
 	TokenDecoder struct {
@@ -75,6 +77,15 @@ func NewTokenGenerator(opts *TokenGeneratorOptions) (*TokenGenerator, error) {
 		Audience:   opts.Audience,
 		Issuer:     opts.Issuer,
 	}
+
+	if opts.AddKIDHeader {
+		kid, err := generateKIDFromPublicKey(&privateKey.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+		tokenGenerator.KID = kid
+	}
+
 	return &tokenGenerator, nil
 }
 
@@ -82,6 +93,11 @@ func NewTokenGenerator(opts *TokenGeneratorOptions) (*TokenGenerator, error) {
 // TODO: how best to handle many different signing algorithms?
 func (tokenGenerator *TokenGenerator) GenerateToken(access []AccessEntry, expiration time.Duration) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS256)
+
+	if tokenGenerator.KID != "" {
+		token.Header["kid"] = tokenGenerator.KID
+	}
+
 	standardClaims := jwt.StandardClaims{}
 
 	now := time.Now()

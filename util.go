@@ -17,12 +17,18 @@ limitations under the License.
 package auth
 
 import (
+	"bytes"
+	"crypto"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/dgrijalva/jwt-go"
 	"io/ioutil"
+	"strings"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 func containsAction(actionsList []string, action string) bool {
@@ -86,4 +92,29 @@ func getTokenCustomClaims(token *jwt.Token) (*Claims, error) {
 	claims := Claims{}
 	json.Unmarshal(byteData, &claims)
 	return &claims, nil
+}
+
+// adapted from "" method here: https://github.com/docker/libtrust/blob/aabc10ec26b754e797f9028f4589c5b7bd90dc20/util.go#L194
+func generateKIDFromPublicKey(pubKey *rsa.PublicKey) (string, error) {
+	derBytes, err := x509.MarshalPKIXPublicKey(pubKey)
+	if err != nil {
+		return "", err
+	}
+	hasher := crypto.SHA256.New()
+	hasher.Write(derBytes)
+	return keyIDEncode(hasher.Sum(nil)[:30]), nil
+}
+
+// copied from here: https://github.com/docker/libtrust/blob/aabc10ec26b754e797f9028f4589c5b7bd90dc20/util.go#L181
+func keyIDEncode(b []byte) string {
+	s := strings.TrimRight(base32.StdEncoding.EncodeToString(b), "=")
+	var buf bytes.Buffer
+	var i int
+	for i = 0; i < len(s)/4-1; i++ {
+		start := i * 4
+		end := start + 4
+		buf.WriteString(s[start:end] + ":")
+	}
+	buf.WriteString(s[i*4:])
+	return buf.String()
 }
