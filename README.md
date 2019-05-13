@@ -227,6 +227,19 @@ cmTokenGenerator, err := cmAuth.NewTokenGenerator(&cmAuth.TokenGeneratorOptions{
 })
 ```
 
+### Adding `kid` field to token header
+
+The `kid` header is a fingerprint representing the ID of the key which was used to sign the token.
+
+If you wish to add this to generate tokens, you can do it like so:
+
+```go
+cmTokenGenerator, err := cmAuth.NewTokenGenerator(&cmAuth.TokenGeneratorOptions{
+    PrivateKeyPath: "./testdata/server.key",
+    AddKIDHeader:   true, // <-------
+})
+```
+
 ## Supported JWT Signing Algorithms
 
 - RS256
