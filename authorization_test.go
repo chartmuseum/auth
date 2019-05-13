@@ -40,6 +40,8 @@ type AuthorizationTestSuite struct {
 
 	UnknownTypeAuthorizer *Authorizer
 
+	CustomAccessEntryTypeAuthorizer *Authorizer
+
 	BasicBadAuthorizationHeader          string
 	BasicGoodAuthorizationHeader         string
 	BasicExpectedWWWAuthHeader           string
@@ -102,6 +104,14 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 	suite.Nil(err)
 
 	suite.UnknownTypeAuthorizer = &Authorizer{Type: AuthorizerType("unknown")}
+
+	suite.CustomAccessEntryTypeAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+		Realm:           "https://my.site.io/oauth2/token",
+		Service:         "my.site.io",
+		PublicKeyPath:   testPublicKey,
+		AccessEntryType: "blah-blah-blah",
+	})
+	suite.Nil(err)
 
 	suite.BasicBadAuthorizationHeader = generateBasicAuthHeader("cm-test-baduser", "cm-test-badpass")
 	suite.BasicGoodAuthorizationHeader = generateBasicAuthHeader("cm-test-user", "cm-test-pass")
@@ -311,6 +321,40 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+}
+
+func (suite *AuthorizationTestSuite) TestCustomAccessEntryTypeAuthorizer() {
+	// Using default access entry type does not provide access
+	access := []AccessEntry{
+		{
+			Name:    DefaultNamespace,
+			Type:    AccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader := fmt.Sprintf("Bearer %s", signedString)
+	permission, err := suite.CustomAccessEntryTypeAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	suite.False(permission.Allowed)
+	suite.NotEmpty(permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Using custom access entry type does indeed provide access
+	access = []AccessEntry{
+		{
+			Name:    DefaultNamespace,
+			Type:    "blah-blah-blah",
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.CustomAccessEntryTypeAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	suite.True(permission.Allowed)
+	suite.Empty(permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 }
 

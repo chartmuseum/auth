@@ -46,6 +46,7 @@ type (
 		BasicAuthMatchHeader string
 		TokenDecoder         *TokenDecoder
 		AnonymousActions     []string
+		AccessEntryType      string
 	}
 
 	// BasicAuthAuthorizerOptions is TODO
@@ -57,6 +58,7 @@ type (
 		PublicKey        []byte
 		PublicKeyPath    string
 		AnonymousActions []string
+		AccessEntryType  string
 	}
 
 	// Permission is TODO
@@ -71,6 +73,12 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 	authorizer := Authorizer{
 		Realm:            opts.Realm,
 		AnonymousActions: opts.AnonymousActions,
+	}
+
+	if opts.AccessEntryType == "" {
+		authorizer.AccessEntryType = AccessEntryType
+	} else {
+		authorizer.AccessEntryType = opts.AccessEntryType
 	}
 
 	if opts.Username != "" && opts.Password != "" {
@@ -151,7 +159,7 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 		claims, err := getTokenCustomClaims(token)
 		if err == nil {
 			for _, entry := range claims.Access {
-				if entry.Type == AccessEntryType {
+				if entry.Type == authorizer.AccessEntryType {
 					if entry.Name == namespace {
 						for _, act := range entry.Actions {
 							if act == action {
@@ -173,7 +181,7 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 			namespace = DefaultNamespace
 		}
 		wwwAuthenticateHeader = fmt.Sprintf("Bearer realm=\"%s\",service=\"%s\",scope=\"%s:%s:%s\"",
-			authorizer.Realm, authorizer.Service, AccessEntryType, namespace, action)
+			authorizer.Realm, authorizer.Service, authorizer.AccessEntryType, namespace, action)
 	}
 
 	permission := Permission{

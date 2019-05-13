@@ -198,6 +198,22 @@ If access denied, the `WWW-Authenticate` header returned will resemble the follo
 WWW-Authenticate: Bearer realm="https://my.site.io/oauth2/token",service="my.site.io",scope="artifact-repository:org1/repo1:push"
 ```
 
+### Using a custom access entry type
+
+By default, the "Type" of each claim checked for upon authorization is `artifact-repository`.
+
+If you wish, you may customize this field upon construction of the Authorizer:
+
+For example, for custom type "myartifact", you do the following:
+```go
+myAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+    Realm:           "https://my.site.io/oauth2/token",
+    Service:         "my.site.io",
+    PublicKeyPath:   myPublicKey,
+    AccessEntryType: "myartifact", // <-------
+})
+```
+
 ## Supported JWT Signing Algorithms
 
 - RS256
