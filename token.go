@@ -18,8 +18,9 @@ package auth
 
 import (
 	"crypto/rsa"
-	"github.com/dgrijalva/jwt-go"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 const (
@@ -29,7 +30,9 @@ const (
 type (
 	Claims struct {
 		*jwt.StandardClaims
-		Access []AccessEntry `json:"access"`
+		Access   []AccessEntry `json:"access"`
+		Audience string        `json:"aud,omitempty"`
+		Issuer   string        `json:"iss,omitempty"`
 	}
 
 	AccessEntry struct {
@@ -40,11 +43,15 @@ type (
 
 	TokenGenerator struct {
 		PrivateKey *rsa.PrivateKey
+		Audience   string
+		Issuer     string
 	}
 
 	TokenGeneratorOptions struct {
 		PrivateKey     []byte
 		PrivateKeyPath string
+		Audience       string
+		Issuer         string
 	}
 
 	TokenDecoder struct {
@@ -65,6 +72,8 @@ func NewTokenGenerator(opts *TokenGeneratorOptions) (*TokenGenerator, error) {
 
 	tokenGenerator := TokenGenerator{
 		PrivateKey: privateKey,
+		Audience:   opts.Audience,
+		Issuer:     opts.Issuer,
 	}
 	return &tokenGenerator, nil
 }
@@ -82,7 +91,12 @@ func (tokenGenerator *TokenGenerator) GenerateToken(access []AccessEntry, expira
 		standardClaims.ExpiresAt = time.Now().Add(expiration).Unix()
 	}
 
-	token.Claims = &Claims{&standardClaims, access}
+	token.Claims = &Claims{
+		StandardClaims: &standardClaims,
+		Access:         access,
+		Audience:       tokenGenerator.Audience,
+		Issuer:         tokenGenerator.Issuer,
+	}
 	return token.SignedString(tokenGenerator.PrivateKey)
 }
 

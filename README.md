@@ -214,6 +214,19 @@ myAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
 })
 ```
 
+### Adding `aud` and `iss` fields to token claims
+
+If you wish to add the `aud` and `iss` fields to token claims (Audience and Issuer),
+you may construct the TokenGenerator like so:
+
+```go
+cmTokenGenerator, err := cmAuth.NewTokenGenerator(&cmAuth.TokenGeneratorOptions{
+    PrivateKeyPath: "./testdata/server.key",
+    Audience:       "registry.my.site.io", // <-------
+    Issuer:         "auth.my.site.io",     // <-------
+})
+```
+
 ## Supported JWT Signing Algorithms
 
 - RS256

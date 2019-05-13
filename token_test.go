@@ -17,10 +17,11 @@ limitations under the License.
 package auth
 
 import (
-	"github.com/dgrijalva/jwt-go"
-	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/stretchr/testify/suite"
 )
 
 type TokenTestSuite struct {
@@ -30,6 +31,16 @@ type TokenTestSuite struct {
 var (
 	testPublicKey  = "./testdata/server.pem"
 	testPrivateKey = "./testdata/server.key"
+
+	testNamespace = "myorg/myrepo"
+
+	testAccess = []AccessEntry{
+		{
+			Name:    testNamespace,
+			Type:    AccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
 )
 
 func (suite *TokenTestSuite) SetupSuite() {
@@ -46,16 +57,7 @@ func (suite *TokenTestSuite) TestGenerateToken() {
 	})
 	suite.Nil(err)
 
-	namespace := "myorg/myrepo"
-	access := []AccessEntry{
-		{
-			Name:    namespace,
-			Type:    AccessEntryType,
-			Actions: []string{PullAction},
-		},
-	}
-
-	signedString, err := generator.GenerateToken(access, time.Minute*5)
+	signedString, err := generator.GenerateToken(testAccess, time.Minute*5)
 	suite.Nil(err)
 
 	decoder, err := NewTokenDecoder(&TokenDecoderOptions{
@@ -67,6 +69,34 @@ func (suite *TokenTestSuite) TestGenerateToken() {
 	suite.Nil(err)
 
 	suite.Equal(PullAction, token.Claims.(jwt.MapClaims)["access"].([]interface{})[0].(map[string]interface{})["actions"].([]interface{})[0])
+
+	suite.Empty(token.Claims.(jwt.MapClaims)["aud"])
+	suite.Empty(token.Claims.(jwt.MapClaims)["iss"])
+}
+
+func (suite *TokenTestSuite) TestGenerateTokenWithAudienceIssuer() {
+	generator, err := NewTokenGenerator(&TokenGeneratorOptions{
+		PrivateKeyPath: testPrivateKey,
+		Audience:       "myaud",
+		Issuer:         "myiss",
+	})
+	suite.Nil(err)
+
+	signedString, err := generator.GenerateToken(testAccess, time.Minute*5)
+	suite.Nil(err)
+
+	decoder, err := NewTokenDecoder(&TokenDecoderOptions{
+		PublicKeyPath: testPublicKey,
+	})
+	suite.Nil(err)
+
+	token, err := decoder.DecodeToken(signedString)
+	suite.Nil(err)
+
+	suite.Equal(PullAction, token.Claims.(jwt.MapClaims)["access"].([]interface{})[0].(map[string]interface{})["actions"].([]interface{})[0])
+
+	suite.Equal("myaud", token.Claims.(jwt.MapClaims)["aud"])
+	suite.Equal("myiss", token.Claims.(jwt.MapClaims)["iss"])
 }
 
 func TestTokenTestSuite(t *testing.T) {
