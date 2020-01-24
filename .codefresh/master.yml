@@ -1,7 +1,7 @@
 version: '1.0'
 steps:
   test:
-    image: golang:1.12
+    image: golang:1.13
     commands:
       - export GO111MODULE=on
       - go mod download && go mod vendor
