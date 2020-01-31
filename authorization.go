@@ -47,18 +47,21 @@ type (
 		TokenDecoder         *TokenDecoder
 		AnonymousActions     []string
 		AccessEntryType      string
+		DefaultNamespace	 string
 	}
 
 	// BasicAuthAuthorizerOptions is TODO
 	AuthorizerOptions struct {
-		Realm            string
-		Service          string
-		Username         string
-		Password         string
-		PublicKey        []byte
-		PublicKeyPath    string
-		AnonymousActions []string
-		AccessEntryType  string
+		Realm                 string
+		Service               string
+		Username              string
+		Password              string
+		PublicKey             []byte
+		PublicKeyPath         string
+		AnonymousActions      []string
+		AccessEntryType       string
+		DefaultNamespace	  string
+		EmptyDefaultNamespace bool
 	}
 
 	// Permission is TODO
@@ -73,6 +76,20 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 	authorizer := Authorizer{
 		Realm:            opts.Realm,
 		AnonymousActions: opts.AnonymousActions,
+	}
+
+	if opts.AccessEntryType == "" {
+		authorizer.AccessEntryType = AccessEntryType
+	} else {
+		authorizer.AccessEntryType = opts.AccessEntryType
+	}
+
+	if opts.EmptyDefaultNamespace {
+		authorizer.DefaultNamespace = ""
+	} else if opts.DefaultNamespace != "" {
+		authorizer.DefaultNamespace = opts.DefaultNamespace
+	} else {
+		authorizer.DefaultNamespace = DefaultNamespace
 	}
 
 	if opts.AccessEntryType == "" {
@@ -178,7 +195,7 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 
 	if !allowed {
 		if namespace == "" {
-			namespace = DefaultNamespace
+			namespace = authorizer.DefaultNamespace
 		}
 		wwwAuthenticateHeader = fmt.Sprintf("Bearer realm=\"%s\",service=\"%s\",scope=\"%s:%s:%s\"",
 			authorizer.Realm, authorizer.Service, authorizer.AccessEntryType, namespace, action)
