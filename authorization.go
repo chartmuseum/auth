@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"strings"
+	"regexp"
 )
 
 const (
@@ -32,6 +32,8 @@ var (
 
 	BasicAuthAuthorizerType  AuthorizerType = "basic"
 	BearerAuthAuthorizerType AuthorizerType = "bearer"
+
+	bearerTokenMatch = regexp.MustCompile("(?i)bearer (.*)")
 )
 
 type (
@@ -166,7 +168,11 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	var allowed bool
 	var wwwAuthenticateHeader string
 
-	signedString := strings.TrimPrefix(authHeader, "Bearer ")
+	if namespace == "" {
+		namespace = authorizer.DefaultNamespace
+	}
+
+	signedString := bearerTokenMatch.ReplaceAllString(authHeader, "$1")
 
 	// TODO log error
 	token, err := authorizer.TokenDecoder.DecodeToken(signedString)
@@ -194,9 +200,6 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	}
 
 	if !allowed {
-		if namespace == "" {
-			namespace = authorizer.DefaultNamespace
-		}
 		wwwAuthenticateHeader = fmt.Sprintf("Bearer realm=\"%s\",service=\"%s\",scope=\"%s:%s:%s\"",
 			authorizer.Realm, authorizer.Service, authorizer.AccessEntryType, namespace, action)
 	}

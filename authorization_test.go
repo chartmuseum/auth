@@ -42,6 +42,9 @@ type AuthorizationTestSuite struct {
 
 	CustomAccessEntryTypeAuthorizer *Authorizer
 
+	CustomDefaultNamespaceAuthorizer *Authorizer
+	EmptyDefaultNamespaceAuthorizer  *Authorizer
+
 	BasicBadAuthorizationHeader          string
 	BasicGoodAuthorizationHeader         string
 	BasicExpectedWWWAuthHeader           string
@@ -110,6 +113,22 @@ func (suite *AuthorizationTestSuite) SetupSuite() {
 		Service:         "my.site.io",
 		PublicKeyPath:   testPublicKey,
 		AccessEntryType: "blah-blah-blah",
+	})
+	suite.Nil(err)
+
+	suite.CustomDefaultNamespaceAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+		Realm:            "https://my.site.io/oauth2/token",
+		Service:          "my.site.io",
+		PublicKeyPath:    testPublicKey,
+		DefaultNamespace: "woo",
+	})
+	suite.Nil(err)
+
+	suite.EmptyDefaultNamespaceAuthorizer, err = NewAuthorizer(&AuthorizerOptions{
+		Realm:                 "https://my.site.io/oauth2/token",
+		Service:               "my.site.io",
+		PublicKeyPath:         testPublicKey,
+		EmptyDefaultNamespace: true,
 	})
 	suite.Nil(err)
 
@@ -215,7 +234,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader := fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.True(permission.Allowed)
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -242,7 +261,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
 
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.True(permission.Allowed)
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -257,7 +276,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	suite.Equal("", permission.WWWAuthenticateHeader)
 	suite.Nil(err)
 
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, DefaultNamespace)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PushAction, "")
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPushScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -286,7 +305,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	fmt.Println("Sleeping for 2 seconds to test token expiration...")
 	time.Sleep(time.Second * 2)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -302,7 +321,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -318,7 +337,7 @@ func (suite *AuthorizationTestSuite) TestAuthorizeBearerRequest() {
 	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err = suite.BearerAuthAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.False(permission.Allowed)
 	suite.Equal(suite.BearerPullScopeExpectedWWWAuthHeader, permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -336,7 +355,7 @@ func (suite *AuthorizationTestSuite) TestCustomAccessEntryTypeAuthorizer() {
 	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader := fmt.Sprintf("Bearer %s", signedString)
-	permission, err := suite.CustomAccessEntryTypeAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err := suite.CustomAccessEntryTypeAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.False(permission.Allowed)
 	suite.NotEmpty(permission.WWWAuthenticateHeader)
 	suite.Nil(err)
@@ -352,10 +371,101 @@ func (suite *AuthorizationTestSuite) TestCustomAccessEntryTypeAuthorizer() {
 	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
 	suite.Nil(err)
 	authHeader = fmt.Sprintf("Bearer %s", signedString)
-	permission, err = suite.CustomAccessEntryTypeAuthorizer.Authorize(authHeader, PullAction, DefaultNamespace)
+	permission, err = suite.CustomAccessEntryTypeAuthorizer.Authorize(authHeader, PullAction, "")
 	suite.True(permission.Allowed)
 	suite.Empty(permission.WWWAuthenticateHeader)
 	suite.Nil(err)
+}
+
+func (suite *AuthorizationTestSuite) TestCustomDefaultNamespaceAuthorizer() {
+	// Token using default namespace does not work when authorizer configured with custom default namespace
+	access := []AccessEntry{
+		{
+			Name:    DefaultNamespace,
+			Type:    AccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader := fmt.Sprintf("Bearer %s", signedString)
+	permission, err := suite.CustomDefaultNamespaceAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.False(permission.Allowed)
+	suite.NotEmpty(permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Using custom custom default namespace provides access
+	access = []AccessEntry{
+		{
+			Name:    "woo",
+			Type:    AccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.CustomDefaultNamespaceAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Empty(permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+}
+
+func (suite *AuthorizationTestSuite) TestEmptyDefaultNamespaceAuthorizer() {
+	// Token using default namespace does not work when authorizer configured with empty default namespace
+	access := []AccessEntry{
+		{
+			Name:    DefaultNamespace,
+			Type:    AccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+	authHeader := fmt.Sprintf("Bearer %s", signedString)
+	permission, err := suite.EmptyDefaultNamespaceAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.False(permission.Allowed)
+	suite.NotEmpty(permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+
+	// Using empty string namespace provides access
+	access = []AccessEntry{
+		{
+			Name:    "",
+			Type:    AccessEntryType,
+			Actions: []string{PullAction},
+		},
+	}
+	signedString, err = suite.TokenGenerator.GenerateToken(access, 0)
+	suite.Nil(err)
+
+	authHeader = fmt.Sprintf("Bearer %s", signedString)
+	permission, err = suite.EmptyDefaultNamespaceAuthorizer.Authorize(authHeader, PullAction, "")
+	suite.True(permission.Allowed)
+	suite.Empty(permission.WWWAuthenticateHeader)
+	suite.Nil(err)
+}
+
+func (suite *AuthorizationTestSuite) TestTokenBearerCapitalization() {
+	// check that the prefixing "Bearer" used in token auth can be of any capitalization
+	for _, h := range []string{"Bearer", "bearer", "BEARER", "BeArEr"} {
+		access := []AccessEntry{
+			{
+				Name:    "",
+				Type:    AccessEntryType,
+				Actions: []string{PullAction},
+			},
+		}
+		signedString, err := suite.TokenGenerator.GenerateToken(access, 0)
+		suite.Nil(err)
+		authHeader := fmt.Sprintf("%s %s", h, signedString)
+		permission, err := suite.EmptyDefaultNamespaceAuthorizer.Authorize(authHeader, PullAction, "")
+		suite.True(permission.Allowed)
+		suite.Empty(permission.WWWAuthenticateHeader)
+		suite.Nil(err)
+	}
+
 }
 
 func TestAuthorizationTestSuite(t *testing.T) {
