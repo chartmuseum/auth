@@ -46,15 +46,15 @@ type (
 
 	// Authorizer is TODO
 	Authorizer struct {
-		Type                 		AuthorizerType
-		Realm                		string
-		Service              		string
-		BasicAuthMatchHeader 		string
-		TokenDecoder         		*TokenDecoder
-		AnonymousActions     		[]string
-		AccessEntryType      		string
-		DefaultNamespace	 		string
-		AllowedActionsSearchPath	string
+		Type                     AuthorizerType
+		Realm                    string
+		Service                  string
+		BasicAuthMatchHeader     string
+		TokenDecoder             *TokenDecoder
+		AnonymousActions         []string
+		AccessEntryType          string
+		DefaultNamespace         string
+		AllowedActionsSearchPath string
 	}
 
 	// BasicAuthAuthorizerOptions is TODO
