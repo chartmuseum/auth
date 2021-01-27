@@ -17,9 +17,13 @@ limitations under the License.
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/jmespath/go-jmespath"
 	"github.com/pkg/errors"
+	"reflect"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -42,28 +46,30 @@ type (
 
 	// Authorizer is TODO
 	Authorizer struct {
-		Type                 AuthorizerType
-		Realm                string
-		Service              string
-		BasicAuthMatchHeader string
-		TokenDecoder         *TokenDecoder
-		AnonymousActions     []string
-		AccessEntryType      string
-		DefaultNamespace	 string
+		Type                     AuthorizerType
+		Realm                    string
+		Service                  string
+		BasicAuthMatchHeader     string
+		TokenDecoder             *TokenDecoder
+		AnonymousActions         []string
+		AccessEntryType          string
+		DefaultNamespace         string
+		AllowedActionsSearchPath string
 	}
 
 	// BasicAuthAuthorizerOptions is TODO
 	AuthorizerOptions struct {
-		Realm                 string
-		Service               string
-		Username              string
-		Password              string
-		PublicKey             []byte
-		PublicKeyPath         string
-		AnonymousActions      []string
-		AccessEntryType       string
-		DefaultNamespace	  string
-		EmptyDefaultNamespace bool
+		Realm                    string
+		Service                  string
+		Username                 string
+		Password                 string
+		PublicKey                []byte
+		PublicKeyPath            string
+		AnonymousActions         []string
+		AccessEntryType          string
+		DefaultNamespace         string
+		EmptyDefaultNamespace    bool
+		AllowedActionsSearchPath string
 	}
 
 	// Permission is TODO
@@ -98,6 +104,12 @@ func NewAuthorizer(opts *AuthorizerOptions) (*Authorizer, error) {
 		authorizer.AccessEntryType = AccessEntryType
 	} else {
 		authorizer.AccessEntryType = opts.AccessEntryType
+	}
+
+	if opts.AllowedActionsSearchPath == "" {
+		authorizer.AllowedActionsSearchPath = AllowedActionsSearchPath
+	} else {
+		authorizer.AllowedActionsSearchPath = opts.AllowedActionsSearchPath
 	}
 
 	if opts.Username != "" && opts.Password != "" {
@@ -177,23 +189,24 @@ func (authorizer *Authorizer) authorizeBearerAuth(authHeader string, action stri
 	// TODO log error
 	token, err := authorizer.TokenDecoder.DecodeToken(signedString)
 	if err == nil {
-
-		// TODO log error
-		claims, err := getTokenCustomClaims(token)
+		byteData, err := json.Marshal(token.Claims)
 		if err == nil {
-			for _, entry := range claims.Access {
-				if entry.Type == authorizer.AccessEntryType {
-					if entry.Name == namespace {
-						for _, act := range entry.Actions {
-							if act == action {
+			var data interface{}
+			err := json.Unmarshal(byteData, &data)
+			if err == nil {
+				allowedActionsSearchPath := strings.ReplaceAll(strings.ReplaceAll(authorizer.AllowedActionsSearchPath, "$NAMESPACE", namespace), "$ACCESS_ENTRY_TYPE", authorizer.AccessEntryType)
+				result, err := jmespath.Search(allowedActionsSearchPath, data)
+				if err == nil {
+					switch reflect.TypeOf(result).Kind() {
+					case reflect.Slice:
+						allowedActions := reflect.ValueOf(result)
+						for i := 0; i < allowedActions.Len(); i++ {
+							if fmt.Sprintf("%v", allowedActions.Index(i)) == action {
 								allowed = true
 								break
 							}
 						}
 					}
-				}
-				if allowed {
-					break
 				}
 			}
 		}
