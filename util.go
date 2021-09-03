@@ -28,7 +28,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 )
 
 func containsAction(actionsList []string, action string) bool {
@@ -52,7 +52,7 @@ func generatePublicKey(publicKeyPath string, publicKey []byte) (*rsa.PublicKey, 
 		return nil, err
 	}
 
-	// https://github.com/dgrijalva/jwt-go/blob/master/rsa_test.go
+	// https://github.com/golang-jwt/jwt/blob/main/rsa_test.go
 	return jwt.ParseRSAPublicKeyFromPEM(pem)
 }
 
