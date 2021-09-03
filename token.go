@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	AccessEntryType = "artifact-repository"
+	AccessEntryType          = "artifact-repository"
+	AllowedActionsSearchPath = "access[?name=='$NAMESPACE' && type=='$ACCESS_ENTRY_TYPE'].actions[]"
 )
 
 type (
