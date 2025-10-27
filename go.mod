@@ -1,9 +1,9 @@
 module github.com/chartmuseum/auth
 
-go 1.17
+go 1.25
 
 require (
-	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/jmespath/go-jmespath v0.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.1
