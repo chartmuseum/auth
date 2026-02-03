@@ -28,7 +28,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 func containsAction(actionsList []string, action string) bool {
